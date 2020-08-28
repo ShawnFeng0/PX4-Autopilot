@@ -1,19 +1,6 @@
-@###############################################
-@#
-@# EmPy template for generating uORBTopics.cpp file
-@# for logging purposes
-@#
-@###############################################
-@# Start of Template
-@#
-@# Context:
-@#  - msgs (List) list of all msg files
-@#  - multi_topics (List) list of all multi-topic names
-@#  - ids (List) list of all RTPS msg ids
-@###############################################
 /****************************************************************************
  *
- *   Copyright (C) 2013-2020 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2012-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,35 +31,72 @@
  *
  ****************************************************************************/
 
+/**
+ * @file Publication2.hpp
+ *
+ */
+
+#pragma once
+
+#include <px4_platform_common/defines.h>
+#include <systemlib/err.h>
+
+#include "uORBDeviceNode.hpp"
 #include <uORB/topics/uORBTopics.hpp>
 #include <uORB/uORB.h>
-@{
-msg_names = [mn.replace(".msg", "") for mn in msgs]
-msgs_count = len(msg_names)
-msg_names_all = list(set(msg_names + multi_topics)) # set() filters duplicates
-msg_names_all.sort()
-msgs_count_all = len(msg_names_all)
-}@
-@[for msg_name in msg_names]@
-#include <uORB/topics/@(msg_name).h>
-@[end for]
 
-const constexpr struct orb_metadata *const uorb_topics_list[ORB_TOPICS_COUNT] = {
-@[for idx, msg_name in enumerate(msg_names_all, 1)]@
-	&uORB::msg::@(msg_name)@[if idx != msgs_count_all], @[end if]
-@[end for]
+namespace uORB {
+
+class Publication2Base {
+public:
+  bool advertised() const { return _handle != nullptr; }
+
+  bool unadvertise() { return (DeviceNode::unadvertise(_handle) == PX4_OK); }
+
+protected:
+  Publication2Base() = default;
+
+  ~Publication2Base() {
+    if (_handle != nullptr) {
+      // don't automatically unadvertise queued publications (eg
+      // vehicle_command)
+      if (static_cast<DeviceNode *>(_handle)->get_queue_size() == 1) {
+        unadvertise();
+      }
+    }
+  }
+
+  orb_advert_t _handle{nullptr};
 };
 
-const struct orb_metadata *const *orb_get_topics()
-{
-	return uorb_topics_list;
-}
+template <const orb_metadata &meta, uint8_t ORB_QSIZE = 1>
+class Publication2 : public Publication2Base {
+public:
+  /**
+   * Constructor
+   */
+  Publication2() = default;
 
-const struct orb_metadata *get_orb_meta(ORB_ID id)
-{
-	if (id == ORB_ID::INVALID) {
-		return nullptr;
-	}
+  bool advertise() {
+    if (!advertised()) {
+      _handle = orb_advertise_queue(&meta, nullptr, ORB_QSIZE);
+    }
 
-	return uorb_topics_list[static_cast<uint8_t>(id)];
-}
+    return advertised();
+  }
+
+  using T = typename TypeMap<meta>::type;
+
+  /**
+   * Publish the struct
+   * @param data The uORB message struct we are updating.
+   */
+  bool publish(const T &data) {
+    if (!advertised()) {
+      advertise();
+    }
+
+    return (DeviceNode::publish(&meta, _handle, &data) == PX4_OK);
+  }
+};
+} // namespace uORB

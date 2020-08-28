@@ -135,5 +135,13 @@ ORB_DECLARE(@multi_topic);
 @[end for]
 
 #ifdef __cplusplus
+namespace uORB {
+@[for multi_topic in topics]@
+template<> struct TypeMap<uORB::msg::@multi_topic> {
+    using type = @(uorb_struct);
+};
+@[end for]
+}
+
 void print_message(const @uorb_struct& message);
 #endif

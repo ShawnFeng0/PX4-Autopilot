@@ -57,6 +57,12 @@ struct orb_metadata {
 
 typedef const struct orb_metadata *orb_id_t;
 
+#ifdef __cplusplus
+namespace uORB {
+template <const orb_metadata &> struct TypeMap;
+}
+#endif
+
 /**
  * Maximum number of multi topic instances
  */
@@ -71,7 +77,7 @@ typedef const struct orb_metadata *orb_id_t;
  *
  * @param _name		The name of the topic.
  */
-#define ORB_ID(_name)		&__orb_##_name
+#define ORB_ID(_name) __orb_##_name()
 
 /**
  * Declare (prototype) the uORB metadata for a topic (used by code generators).
@@ -79,9 +85,16 @@ typedef const struct orb_metadata *orb_id_t;
  * @param _name		The name of the topic.
  */
 #if defined(__cplusplus)
-# define ORB_DECLARE(_name)		extern "C" const struct orb_metadata __orb_##_name __EXPORT
+#define ORB_DECLARE(_name)                                           \
+  namespace uORB {                                                   \
+  namespace msg {                                                    \
+  extern const struct orb_metadata _name;                            \
+  }                                                                  \
+  }                                                                  \
+  extern "C" const struct orb_metadata *__orb_##_name(void) __EXPORT
 #else
-# define ORB_DECLARE(_name)		extern const struct orb_metadata __orb_##_name __EXPORT
+#define ORB_DECLARE(_name)                                           \
+  extern const struct orb_metadata *__orb_##_name(void) __EXPORT
 #endif
 
 /**
@@ -96,17 +109,19 @@ typedef const struct orb_metadata *orb_id_t;
  * @param _name		The name of the topic.
  * @param _struct	The structure the topic provides.
  * @param _size_no_padding	Struct size w/o padding at the end
- * @param _fields	All fields in a semicolon separated list e.g: "float[3] position;bool armed"
+ * @param _fields	All fields in a semicolon separated list e.g: "float[3]
+ * position;bool armed"
  * @param _orb_id_enum	ORB ID enum e.g.: ORB_ID::vehicle_status
  */
-#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _orb_id_enum)		\
-	const struct orb_metadata __orb_##_name = {	\
-		#_name,					\
-		sizeof(_struct),		\
-		_size_no_padding,			\
-		_fields,				\
-		_orb_id_enum				\
-	}; struct hack
+#define ORB_DEFINE(_name, _struct, _size_no_padding, _fields, _orb_id_enum)    \
+  namespace uORB {                                                             \
+  namespace msg {                                                              \
+  const struct orb_metadata _name = {#_name, sizeof(_struct),                  \
+                                     _size_no_padding, _fields, _orb_id_enum}; \
+  }                                                                            \
+  }                                                                            \
+  const struct orb_metadata *__orb_##_name() { return &uORB::msg::_name; }     \
+  struct hack
 
 __BEGIN_DECLS
 
