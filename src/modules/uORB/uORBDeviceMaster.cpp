@@ -99,6 +99,32 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_adver
 			*instance = group_tries;
 		}
 
+		/* if the node exists already, get the existing one and check if it's advertised. */
+		uORB::DeviceNode *existing_node = getDeviceNodeLocked(meta, group_tries);
+
+		/*
+		 * We can claim an existing node in these cases:
+		 * - The node is not advertised (yet). It means there is already one or more subscribers or it was
+		 *   unadvertised.
+		 * - We are a single-instance advertiser requesting the first instance.
+		 *   (Usually we don't end up here, but we might in case of a race condition between 2
+		 *   advertisers).
+		 * - We are a subscriber requesting a certain instance.
+		 *   (Also we usually don't end up in that case, but we might in case of a race condtion
+		 *   between an advertiser and subscriber).
+		 */
+		bool is_single_instance_advertiser = is_advertiser && !instance;
+
+		if (existing_node != nullptr &&
+		    (!existing_node->is_advertised() || is_single_instance_advertiser || !is_advertiser)) {
+			if (is_advertiser) {
+				existing_node->add_publisher();
+			}
+
+			ret = PX4_OK;
+			break; // Node has been found
+		}
+
 		/* driver wants a permanent copy of the path, so make one here */
 		const char *devpath = strdup(nodepath);
 
@@ -122,42 +148,9 @@ int uORB::DeviceMaster::advertise(const struct orb_metadata *meta, bool is_adver
 		if (ret != PX4_OK) {
 			delete node;
 
-			if (ret == -EEXIST) {
-				/* if the node exists already, get the existing one and check if it's advertised. */
-				uORB::DeviceNode *existing_node = getDeviceNodeLocked(meta, group_tries);
-
-				/*
-				 * We can claim an existing node in these cases:
-				 * - The node is not advertised (yet). It means there is already one or more subscribers or it was
-				 *   unadvertised.
-				 * - We are a single-instance advertiser requesting the first instance.
-				 *   (Usually we don't end up here, but we might in case of a race condition between 2
-				 *   advertisers).
-				 * - We are a subscriber requesting a certain instance.
-				 *   (Also we usually don't end up in that case, but we might in case of a race condtion
-				 *   between an advertiser and subscriber).
-				 */
-				bool is_single_instance_advertiser = is_advertiser && !instance;
-
-				if (existing_node != nullptr &&
-				    (!existing_node->is_advertised() || is_single_instance_advertiser || !is_advertiser)) {
-					if (is_advertiser) {
-						/* Set as advertised to avoid race conditions (otherwise 2 multi-instance advertisers
-						 * could get the same instance).
-						 */
-						existing_node->mark_as_advertised();
-					}
-
-					ret = PX4_OK;
-
-				} else {
-					/* otherwise: already advertised, keep looking */
-				}
-			}
-
 		} else {
 			if (is_advertiser) {
-				node->mark_as_advertised();
+				node->add_publisher();
 			}
 
 			// add to the node map.
