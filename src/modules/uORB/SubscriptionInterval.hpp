@@ -95,11 +95,7 @@ public:
 	 * */
 	bool updated()
 	{
-		if (advertised() && (hrt_elapsed_time(&_last_update) >= _interval_us)) {
-			return _subscription.updated();
-		}
-
-		return false;
+		return _subscription.updated() && (hrt_elapsed_time(&_last_update) >= _interval_us);
 	}
 
 	/**
@@ -109,11 +105,7 @@ public:
 	 */
 	bool update(void *dst)
 	{
-		if (updated()) {
-			return copy(dst);
-		}
-
-		return false;
+		return updated() && copy(dst);
 	}
 
 	/**

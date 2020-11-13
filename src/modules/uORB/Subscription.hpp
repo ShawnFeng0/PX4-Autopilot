@@ -117,27 +117,15 @@ public:
 	void unsubscribe();
 
 	bool valid() const { return _node != nullptr; }
-	bool advertised()
-	{
-		if (valid()) {
-			return _node->is_advertised();
-		}
 
-		// try to initialize
-		if (subscribe()) {
-			// check again if valid
-			if (valid()) {
-				return _node->is_advertised();
-			}
-		}
+	bool subscribed() { return valid() || (subscribe() && valid()); }
 
-		return false;
-	}
+	bool advertised() { return subscribed() && _node->is_advertised(); }
 
 	/**
 	 * Check if there is a new update.
 	 */
-	bool updated() { return advertised() && _node->updates_available(_last_generation); }
+	bool updated() { return subscribed() && _node->updates_available(_last_generation); }
 
 	/**
 	 * Update the struct
@@ -149,7 +137,7 @@ public:
 	 * Copy the struct
 	 * @param dst The uORB message struct we are updating.
 	 */
-	bool copy(void *dst) { return advertised() && _node->copy(dst, _last_generation); }
+	bool copy(void *dst) { return subscribed() && _node->copy(dst, _last_generation); }
 
 	/**
 	 * Change subscription instance

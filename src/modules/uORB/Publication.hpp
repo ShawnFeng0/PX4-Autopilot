@@ -80,13 +80,10 @@ protected:
 
 	PublicationBase(ORB_ID id) : _orb_id(id) {}
 
-	~PublicationBase()
+	virtual ~PublicationBase()
 	{
 		if (_handle != nullptr) {
-			// don't automatically unadvertise queued publications (eg vehicle_command)
-			if (static_cast<DeviceNode *>(_handle)->get_queue_size() == 1) {
-				unadvertise();
-			}
+			unadvertise();
 		}
 	}
 
