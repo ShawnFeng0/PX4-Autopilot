@@ -46,6 +46,8 @@ SRC_DIR=$PWD/../
 CCACHE_DIR=${HOME}/.ccache
 mkdir -p "${CCACHE_DIR}"
 
+podman unshare chown "$(whoami)":"$(whoami)" -R "${SRC_DIR}" "${CCACHE_DIR}"
+
 docker run -it --rm -w "${SRC_DIR}" \
 	--env=AWS_ACCESS_KEY_ID \
 	--env=AWS_SECRET_ACCESS_KEY \
@@ -65,3 +67,5 @@ docker run -it --rm -w "${SRC_DIR}" \
 	--volume=${CCACHE_DIR}:${CCACHE_DIR}:rw \
 	--volume=${SRC_DIR}:${SRC_DIR}:rw \
 	${PX4_DOCKER_REPO} /bin/bash -c "$1 $2 $3"
+
+podman unshare chown root:root -R "${SRC_DIR}" "${CCACHE_DIR}"
